@@ -1,7 +1,6 @@
 package com.github.kongchen.swagger.docgen;
 
 import com.github.kongchen.swagger.docgen.jaxrs.BeanParamInjectParamExtension;
-import com.github.kongchen.swagger.docgen.jaxrs.JaxrsParameterExtension;
 import com.github.kongchen.swagger.docgen.reader.JaxrsReader;
 import com.github.kongchen.swagger.docgen.spring.SpringSwaggerExtension;
 import com.google.common.collect.Lists;

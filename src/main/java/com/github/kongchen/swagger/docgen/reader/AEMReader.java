@@ -2,32 +2,26 @@ package com.github.kongchen.swagger.docgen.reader;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo.As;
-import com.github.kongchen.swagger.docgen.jaxrs.JaxrsParameterExtension;
+import com.github.kongchen.swagger.docgen.aem.AemParameterExtension;
+import com.github.kongchen.swagger.docgen.aem.BeanParamInjectParamExtension;
+import com.github.kongchen.swagger.docgen.annotations.AemModel;
+import com.github.kongchen.swagger.docgen.annotations.Component;
+import io.swagger.annotations.*;
+import io.swagger.converter.ModelConverters;
+import io.swagger.jaxrs.ext.SwaggerExtension;
+import io.swagger.jaxrs.ext.SwaggerExtensions;
+import io.swagger.jersey.SwaggerJerseyJaxrs;
+import io.swagger.models.Tag;
+import io.swagger.models.*;
+import io.swagger.models.parameters.BodyParameter;
+import io.swagger.models.parameters.Parameter;
+import io.swagger.models.parameters.RefParameter;
+import io.swagger.models.properties.Property;
+import io.swagger.models.properties.RefProperty;
 import io.swagger.models.properties.StringProperty;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.HEAD;
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.OPTIONS;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-
+import io.swagger.models.refs.RefType;
+import io.swagger.util.BaseReaderUtils;
+import io.swagger.util.ReflectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.logging.Log;
 import org.reflections.Reflections;
@@ -35,39 +29,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.AnnotationUtils;
 
-import com.github.kongchen.swagger.docgen.jaxrs.BeanParamInjectParamExtension;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.Authorization;
-import io.swagger.annotations.AuthorizationScope;
-import io.swagger.annotations.SwaggerDefinition;
-import io.swagger.converter.ModelConverters;
-import io.swagger.jaxrs.ext.SwaggerExtension;
-import io.swagger.jaxrs.ext.SwaggerExtensions;
-import io.swagger.jersey.SwaggerJerseyJaxrs;
-import io.swagger.models.ArrayModel;
-import io.swagger.models.Model;
-import io.swagger.models.ModelImpl;
-import io.swagger.models.Operation;
-import io.swagger.models.Response;
-import io.swagger.models.SecurityRequirement;
-import io.swagger.models.Swagger;
-import io.swagger.models.Tag;
-import io.swagger.models.parameters.BodyParameter;
-import io.swagger.models.parameters.Parameter;
-import io.swagger.models.parameters.RefParameter;
-import io.swagger.models.properties.Property;
-import io.swagger.models.properties.RefProperty;
-import io.swagger.models.refs.RefType;
-import io.swagger.util.BaseReaderUtils;
-import io.swagger.util.ReflectionUtils;
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.Path;
+import javax.ws.rs.*;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.*;
 
-public class JaxrsReader extends AbstractReader implements ClassSwaggerReader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(JaxrsReader.class);
+public class AEMReader extends AbstractReader implements ClassSwaggerReader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AEMReader.class);
     private static final ResponseContainerConverter RESPONSE_CONTAINER_CONVERTER = new ResponseContainerConverter();
 
-  public JaxrsReader(Swagger swagger, Log LOG) {
+  public AEMReader(Swagger swagger, Log LOG) {
         super(swagger, LOG);
     }
 
@@ -76,7 +52,7 @@ public class JaxrsReader extends AbstractReader implements ClassSwaggerReader {
         List<SwaggerExtension> extensions = new ArrayList<>();
         extensions.add(new BeanParamInjectParamExtension(this));
         extensions.add(new SwaggerJerseyJaxrs());
-        extensions.add(new JaxrsParameterExtension());
+        extensions.add(new AemParameterExtension());
         SwaggerExtensions.setExtensions(extensions);
     }
 
@@ -103,7 +79,8 @@ public class JaxrsReader extends AbstractReader implements ClassSwaggerReader {
         }
         Api api = AnnotationUtils.findAnnotation(cls, Api.class);
         Path apiPath = AnnotationUtils.findAnnotation(cls, Path.class);
-
+        Component servlet = AnnotationUtils.findAnnotation(cls, Component.class);
+        AemModel model = AnnotationUtils.findAnnotation(cls, AemModel.class);
         // only read if allowing hidden apis OR api is not marked as hidden
         if (!canReadApi(readHidden, api)) {
             return swagger;
@@ -544,20 +521,14 @@ public class JaxrsReader extends AbstractReader implements ClassSwaggerReader {
     public String extractOperationMethod(ApiOperation apiOperation, Method method, Iterator<SwaggerExtension> chain) {
         if (apiOperation != null && !apiOperation.httpMethod().isEmpty()) {
             return apiOperation.httpMethod().toLowerCase();
-        } else if (AnnotationUtils.findAnnotation(method, GET.class) != null) {
+        } else if (method.getName().equals("doGet")) {
             return "get";
-        } else if (AnnotationUtils.findAnnotation(method, PUT.class) != null) {
+        } else if (method.getName().equals("doPut")) {
             return "put";
-        } else if (AnnotationUtils.findAnnotation(method, POST.class) != null) {
+        } else if (method.getName().equals("doPost")) {
             return "post";
-        } else if (AnnotationUtils.findAnnotation(method, DELETE.class) != null) {
+        } else if (method.getName().equals("doDelete")) {
             return "delete";
-        } else if (AnnotationUtils.findAnnotation(method, OPTIONS.class) != null) {
-            return "options";
-        } else if (AnnotationUtils.findAnnotation(method, HEAD.class) != null) {
-            return "head";
-        } else if (AnnotationUtils.findAnnotation(method, io.swagger.jaxrs.PATCH.class) != null) {
-            return "patch";
         } else {
             // check for custom HTTP Method annotations
             for (Annotation declaredAnnotation : method.getDeclaredAnnotations()) {

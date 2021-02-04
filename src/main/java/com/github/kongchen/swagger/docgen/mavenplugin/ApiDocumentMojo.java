@@ -103,18 +103,24 @@ public class ApiDocumentMojo extends AbstractMojo {
 
             if (enabledObjectMapperFeatures!=null) {
                 configureObjectMapperFeatures(enabledObjectMapperFeatures,true);
-                
+
             }
 
             if (disabledObjectMapperFeatures!=null) {
                 configureObjectMapperFeatures(disabledObjectMapperFeatures,false);
             }
-            
+
             for (ApiSource apiSource : apiSources) {
                 validateConfiguration(apiSource);
+
+
                 AbstractDocumentSource documentSource = apiSource.isSpringmvc()
                         ? new SpringMavenDocumentSource(apiSource, getLog(), projectEncoding)
                         : new MavenDocumentSource(apiSource, getLog(), projectEncoding);
+
+                if (apiSource.isAem()) {
+                    documentSource = new AemMavenDocumentSource(apiSource, getLog(), projectEncoding);
+                }
 
                 documentSource.loadTypesToSkip();
                 documentSource.loadModelModifier();
